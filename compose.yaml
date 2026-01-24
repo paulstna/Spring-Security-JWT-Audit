@@ -1,0 +1,62 @@
+services:
+  postgresdb:
+    image: postgres:17-alpine
+    container_name: postgres-db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+    
+  spring-security-app:
+      build:
+        context: ./SpringSecurityApp
+        dockerfile: Dockerfile
+      container_name: spring-security-app 
+      environment:
+        SPRING_PROFILES_ACTIVE: prod
+        DB_HOST: postgresdb
+        DB_PORT: 5432
+        DB_NAME: ${DB_NAME}
+        DB_USERNAME: ${DB_USERNAME}
+        DB_PASSWORD: ${DB_PASSWORD}
+        JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+        JWT_AUTH_EXPIRATION: ${JWT_AUTH_EXPIRATION:-900}
+        JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-1296000}
+      restart: unless-stopped
+      ports:
+        - "8080:8080"
+      volumes:
+        - ./logs:/app/logs
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 60s
+      networks:
+        - app-network
+      depends_on:
+        postgresdb:
+          condition: service_healthy
+
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+
+volumes:
+  postgres-data:

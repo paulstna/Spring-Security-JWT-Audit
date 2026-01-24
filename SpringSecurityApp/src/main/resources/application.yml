@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: spring-security-app
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: never
+      continue-on-error: false
+  mvc:
+    apiversion:
+      use:
+        path-segment: 1
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  auth-token:
+    expiration: ${JWT_AUTH_EXPIRATION:900}      # 15 min
+  refresh-token:
+    expiration: ${JWT_REFRESH_EXPIRATION:1296000} # 15 días
+
+bucket:
+  limited-endpoints:
+    - login
+    - register
+    - refresh
+  bucket-metrics:
+    login:
+      capacity: 5
+      refill-tokens: 2
+      refill-time: 60
+    register:
+      capacity: 3
+      refill-tokens: 3
+      refill-time: 600
+    refresh:
+      capacity: 3
+      refill-tokens: 3
+      refill-time: 300

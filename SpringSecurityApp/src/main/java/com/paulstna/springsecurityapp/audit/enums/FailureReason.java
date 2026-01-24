@@ -1,0 +1,16 @@
+package com.paulstna.springsecurityapp.audit.enums;
+
+public enum FailureReason {
+    INVALID_CREDENTIALS,
+    USER_NOT_FOUND,
+    ACCOUNT_LOCKED,
+    ACCOUNT_DISABLED,
+
+    TOKEN_REQUIRED,
+    INVALID_TOKEN,
+    TOKEN_OWNERSHIP_MISMATCH,
+
+    INVALID_STATE,
+    UNEXPECTED_ERROR,
+    SYSTEM_ERROR
+}

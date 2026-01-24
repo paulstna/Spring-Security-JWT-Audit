@@ -1,0 +1,17 @@
+package com.paulstna.springsecurityapp.audit.enums;
+
+public enum EventAction {
+    LOGIN_ATTEMPT,
+    LOGIN_SUCCESS,
+    LOGIN_FAILED,
+
+    REGISTER_ATTEMPT,
+    REGISTER_SUCCESS,
+    REGISTER_FAILED,
+
+    REFRESH_TOKEN_ATTEMPT,
+    REFRESH_TOKEN_SUCCESS,
+    REFRESH_TOKEN_FAILED,
+
+    LOGOUT
+}
