@@ -1,0 +1,11 @@
+# Environment / secrets
+.env
+*.env
+!.env.example
+
+# Logs (generated at runtime, mounted by docker compose)
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
