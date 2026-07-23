@@ -18,27 +18,27 @@ public class UserController {
 
     private final IUserEntityService userEntityService;
 
-    @GetMapping(version = "1")
+    @GetMapping(version = "v1")
     public ResponseEntity<List<UserEntity>> findAll() {
         return ResponseEntity.ok(userEntityService.findAll());
     }
 
-    @GetMapping(path = "/{id}", version = "1")
+    @GetMapping(path = "/{id}", version = "v1")
     public ResponseEntity<UserEntity> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(userEntityService.findById(id));
     }
 
-    @PostMapping(version = "1")
+    @PostMapping(version = "v1")
     public ResponseEntity<UserEntity> create(@RequestBody UserDto userDto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userEntityService.createUser(userDto));
     }
 
-    @PutMapping(path = "/{id}", version = "1")
+    @PutMapping(path = "/{id}", version = "v1")
     public ResponseEntity<UserEntity> update(@PathVariable UUID id, @RequestBody UserDto userDto) {
         return ResponseEntity.ok(userEntityService.update(id, userDto));
     }
 
-    @DeleteMapping(path = "/{id}", version = "1")
+    @DeleteMapping(path = "/{id}", version = "v1")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         userEntityService.deleteById(id);
         return ResponseEntity.noContent().build();

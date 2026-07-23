@@ -8,6 +8,7 @@ import com.paulstna.springsecurityapp.auth.service.IAuthService;
 import com.paulstna.springsecurityapp.common.util.HttpRequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -22,6 +23,12 @@ import java.time.Duration;
 public class AuthController {
 
     private final IAuthService authService;
+
+    @Value("${app.cookie.secure:true}")
+    private boolean cookieSecure;
+
+    @Value("${jwt.refresh-token.expiration}")
+    private long refreshExpirationSeconds;
 
     @PostMapping(path = "/register", version = "v1")
     public ResponseEntity<AuthResponse> register(
@@ -100,19 +107,19 @@ public class AuthController {
     private ResponseCookie createRefreshTokenCookie(String refreshToken) {
         return ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(cookieSecure)
                 .sameSite("Strict")
-                .path("/api/v1/auth/refresh")
-                .maxAge(Duration.ofDays(7))
+                .path("/api/v1/auth")
+                .maxAge(Duration.ofSeconds(refreshExpirationSeconds))
                 .build();
     }
 
     private ResponseCookie deleteRefreshTokenCookie() {
         return ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(cookieSecure)
                 .sameSite("Strict")
-                .path("/api/v1/auth/refresh")
+                .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
     }

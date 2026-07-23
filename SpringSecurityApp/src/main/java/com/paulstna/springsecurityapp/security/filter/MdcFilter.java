@@ -24,9 +24,8 @@ public class MdcFilter extends OncePerRequestFilter {
 
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-            if (auth != null && auth.isAuthenticated()) {
-                SecurityUser user = (SecurityUser) auth.getPrincipal();
-                assert user != null;
+            if (auth != null && auth.isAuthenticated()
+                    && auth.getPrincipal() instanceof SecurityUser user) {
                 MDC.put("user", user.getUsername());
             }
 

@@ -45,6 +45,7 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     @Override
+    @Transactional
     public AuthInternalResponseDto login(LoginRequest loginRequest, String userAgent, String ip) {
         Authentication authentication =  authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
