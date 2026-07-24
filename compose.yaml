@@ -11,7 +11,6 @@ services:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./sql:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 10s
@@ -27,6 +26,9 @@ services:
         dockerfile: Dockerfile
       container_name: spring-security-app 
       environment:
+        # Demo users (admin/manager/user) are seeded by Flyway in every profile.
+        # 'dev'  -> refresh cookie over plain HTTP + DEBUG logging (local testing).
+        # 'prod' -> HTTPS-only cookie + INFO logging.
         SPRING_PROFILES_ACTIVE: prod
         DB_HOST: postgresdb
         DB_PORT: 5432

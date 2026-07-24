@@ -1,0 +1,17 @@
+# Production profile
+# Activated by docker compose (SPRING_PROFILES_ACTIVE: prod).
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+app:
+  cookie:
+    # HTTPS-only cookies in production.
+    secure: true
+
+logging:
+  level:
+    com.paulstna.springsecurityapp: INFO
+    org.hibernate.SQL: WARN

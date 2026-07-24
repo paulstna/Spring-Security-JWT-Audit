@@ -32,7 +32,7 @@ public class UserEntity extends Auditable {
 
     @OneToMany(
             mappedBy = "user",
-            cascade = {CascadeType.REMOVE},
+            cascade = {CascadeType.PERSIST, CascadeType.REMOVE},
             orphanRemoval = true,
             fetch = FetchType.LAZY
     )

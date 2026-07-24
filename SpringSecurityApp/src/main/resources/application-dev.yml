@@ -1,0 +1,16 @@
+# Development profile — convenient local testing over plain HTTP.
+# Run with: SPRING_PROFILES_ACTIVE=dev  (or -Dspring.profiles.active=dev)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+app:
+  cookie:
+    # Allow the refresh cookie over http://localhost (no HTTPS in dev).
+    secure: false
+
+logging:
+  level:
+    com.paulstna.springsecurityapp: DEBUG
