@@ -10,7 +10,7 @@ import java.util.Set;
 public interface ITokenService {
     Token save(Token token);
 
-    Optional<Token> findByJwtToken(String token);
+    Optional<Token> findByRefreshToken(String rawRefreshToken);
 
     void delete(Token token);
 
@@ -18,8 +18,8 @@ public interface ITokenService {
 
     void deleteByUserAndUserAgent(UserEntity userEntity, String userAgent);
 
-    Token buildToken(UserEntity userEntity, String jwtToken, String userAgent, String ip, TokenType tokenType);
+    Token buildToken(UserEntity userEntity, String rawRefreshToken, String userAgent, String ip, TokenType tokenType);
 
-    Token buildToken(String jwtToken, String userAgent, String ip, TokenType tokenType);
+    Token buildToken(String rawRefreshToken, String userAgent, String ip, TokenType tokenType);
 
 }

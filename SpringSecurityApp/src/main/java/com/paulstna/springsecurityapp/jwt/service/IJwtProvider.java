@@ -1,5 +1,6 @@
 package com.paulstna.springsecurityapp.jwt.service;
 
+import com.paulstna.springsecurityapp.jwt.domain.TokenType;
 import com.paulstna.springsecurityapp.user.domain.Role;
 import io.jsonwebtoken.Claims;
 
@@ -11,6 +12,8 @@ public interface IJwtProvider {
     String buildRefreshJwt(String username);
 
     String extractUsername(String token);
+
+    TokenType extractTokenType(String token);
 
     boolean isJwtValid(String token);
 

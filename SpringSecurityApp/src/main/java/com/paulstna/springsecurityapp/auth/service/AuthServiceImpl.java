@@ -81,12 +81,16 @@ public class AuthServiceImpl implements IAuthService {
             throw new InvalidTokenException("Invalid refresh token");
         }
 
+        if (jwtProvider.extractTokenType(refreshToken) != TokenType.REFRESH_TOKEN) {
+            throw new InvalidTokenException("Invalid refresh token");
+        }
+
         String username = jwtProvider.extractUsername(refreshToken);
         if (username == null) {
             throw new InvalidTokenException("Invalid refresh token");
         }
 
-        Token dbToken = tokenService.findByJwtToken(refreshToken)
+        Token dbToken = tokenService.findByRefreshToken(refreshToken)
                 .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
 
         UserEntity userEntity = dbToken.getUser();
@@ -125,7 +129,7 @@ public class AuthServiceImpl implements IAuthService {
             return;
         }
 
-        tokenService.findByJwtToken(refreshToken)
+        tokenService.findByRefreshToken(refreshToken)
                 .ifPresent(tokenService::delete);
     }
 

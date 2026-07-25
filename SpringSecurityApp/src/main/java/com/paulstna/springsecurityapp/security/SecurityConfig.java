@@ -45,9 +45,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/api/v1/users").hasRole("MANAGER")
+                                .requestMatchers(HttpMethod.GET, "/api/v1/users", "/api/v1/users/**").hasRole("MANAGER")
                                 .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.PUT, "/api/v1/users").hasRole("MANAGER")
+                                .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("MANAGER")
                                 .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
                                 .requestMatchers(
                                         "/api/v1/auth/register",

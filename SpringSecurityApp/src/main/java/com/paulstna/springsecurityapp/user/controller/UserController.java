@@ -1,7 +1,8 @@
 package com.paulstna.springsecurityapp.user.controller;
 
-import com.paulstna.springsecurityapp.user.domain.UserEntity;
-import com.paulstna.springsecurityapp.user.dto.UserDto;
+import com.paulstna.springsecurityapp.user.dto.UserRequestDTO;
+import com.paulstna.springsecurityapp.user.dto.UserResponseDTO;
+import com.paulstna.springsecurityapp.user.mapper.UserMapper;
 import com.paulstna.springsecurityapp.user.service.IUserEntityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,23 +20,25 @@ public class UserController {
     private final IUserEntityService userEntityService;
 
     @GetMapping(version = "v1")
-    public ResponseEntity<List<UserEntity>> findAll() {
-        return ResponseEntity.ok(userEntityService.findAll());
+    public ResponseEntity<List<UserResponseDTO>> findAll() {
+        return ResponseEntity.ok(UserMapper.toResponseList(userEntityService.findAll()));
     }
 
     @GetMapping(path = "/{id}", version = "v1")
-    public ResponseEntity<UserEntity> findById(@PathVariable UUID id) {
-        return ResponseEntity.ok(userEntityService.findById(id));
+    public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id) {
+        return ResponseEntity.ok(UserMapper.toResponse(userEntityService.findById(id)));
     }
 
     @PostMapping(version = "v1")
-    public ResponseEntity<UserEntity> create(@RequestBody UserDto userDto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userEntityService.createUser(userDto));
+    public ResponseEntity<UserResponseDTO> create(@RequestBody UserRequestDTO userRequestDTO) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(UserMapper.toResponse(userEntityService.createUser(userRequestDTO)));
     }
 
     @PutMapping(path = "/{id}", version = "v1")
-    public ResponseEntity<UserEntity> update(@PathVariable UUID id, @RequestBody UserDto userDto) {
-        return ResponseEntity.ok(userEntityService.update(id, userDto));
+    public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id, @RequestBody UserRequestDTO userRequestDTO) {
+        return ResponseEntity.ok(UserMapper.toResponse(userEntityService.update(id, userRequestDTO)));
     }
 
     @DeleteMapping(path = "/{id}", version = "v1")

@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
@@ -136,7 +137,8 @@ public class ErrorLoggingAspect {
      * Business exceptions should NOT be logged as system errors.
      */
     private boolean isExpectedBusinessException(Throwable ex) {
-        return ex instanceof BadCredentialsException ||
+        return ex instanceof AccessDeniedException ||
+                ex instanceof BadCredentialsException ||
                 ex instanceof InvalidTokenException ||
                 ex instanceof TokenRequiredException ||
                 ex instanceof ResourceNotFoundException ||

@@ -26,6 +26,11 @@ spring:
       use:
         path-segment: 1
 
+app:
+  cookie:
+    secure: true
+  trust-proxy: false
+
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   auth-token:

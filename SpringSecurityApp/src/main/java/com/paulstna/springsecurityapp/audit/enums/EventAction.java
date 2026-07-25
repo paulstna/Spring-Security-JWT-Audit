@@ -13,5 +13,7 @@ public enum EventAction {
     REFRESH_TOKEN_SUCCESS,
     REFRESH_TOKEN_FAILED,
 
-    LOGOUT
+    LOGOUT,
+
+    AUTHORIZATION_DENIED
 }

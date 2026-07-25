@@ -33,6 +33,16 @@ public class SecurityUser implements UserDetails {
         return user.getUsername();
     }
 
+    @Override
+    public boolean isEnabled() {
+        return user.isEnabled();
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return user.isAccountNonLocked();
+    }
+
     public UUID getId() {
         return user.getId();
     }

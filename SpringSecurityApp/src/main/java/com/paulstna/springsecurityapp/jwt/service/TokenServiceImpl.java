@@ -3,6 +3,7 @@ package com.paulstna.springsecurityapp.jwt.service;
 import com.paulstna.springsecurityapp.jwt.domain.Token;
 import com.paulstna.springsecurityapp.jwt.domain.TokenType;
 import com.paulstna.springsecurityapp.jwt.repository.TokenRepository;
+import com.paulstna.springsecurityapp.jwt.util.TokenHasher;
 import com.paulstna.springsecurityapp.user.domain.UserEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,8 @@ public class TokenServiceImpl implements ITokenService {
     }
 
     @Override
-    public Optional<Token> findByJwtToken(String refreshToken) {
-        return tokenRepository.findByJwtToken(refreshToken);
+    public Optional<Token> findByRefreshToken(String rawRefreshToken) {
+        return tokenRepository.findByTokenHash(TokenHasher.hash(rawRefreshToken));
     }
 
     @Override
@@ -47,9 +48,9 @@ public class TokenServiceImpl implements ITokenService {
     }
 
     @Override
-    public Token buildToken(String jwtToken, String userAgent, String ip, TokenType tokenType) {
+    public Token buildToken(String rawRefreshToken, String userAgent, String ip, TokenType tokenType) {
         return Token.builder()
-                .jwtToken(jwtToken)
+                .tokenHash(TokenHasher.hash(rawRefreshToken))
                 .userAgent(userAgent)
                 .tokenType(tokenType)
                 .ipAddress(ip)
@@ -57,8 +58,8 @@ public class TokenServiceImpl implements ITokenService {
     }
 
     @Override
-    public Token buildToken(UserEntity userEntity, String jwtToken, String userAgent, String ip, TokenType tokenType) {
-        Token token = buildToken(jwtToken, userAgent, ip, tokenType);
+    public Token buildToken(UserEntity userEntity, String rawRefreshToken, String userAgent, String ip, TokenType tokenType) {
+        Token token = buildToken(rawRefreshToken, userAgent, ip, tokenType);
         token.setUser(userEntity);
         return token;
     }

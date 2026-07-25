@@ -1,5 +1,6 @@
 package com.paulstna.springsecurityapp.security.filter;
 
+import com.paulstna.springsecurityapp.jwt.domain.TokenType;
 import com.paulstna.springsecurityapp.jwt.service.IJwtProvider;
 import com.paulstna.springsecurityapp.jwt.service.ITokenExtractor;
 import jakarta.servlet.FilterChain;
@@ -43,12 +44,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (jwtProvider.extractTokenType(token.get()) != TokenType.ACCESS_TOKEN) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String username = jwtProvider.extractUsername(token.get());
         if (username == null) {
             filterChain.doFilter(request, response);
             return;
         }
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        if (!userDetails.isEnabled() || !userDetails.isAccountNonLocked()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(

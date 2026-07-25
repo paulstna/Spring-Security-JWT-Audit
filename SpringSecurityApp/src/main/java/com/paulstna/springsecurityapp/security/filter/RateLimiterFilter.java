@@ -3,6 +3,7 @@ package com.paulstna.springsecurityapp.security.filter;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.paulstna.springsecurityapp.bucket.service.IBucketService;
 import com.paulstna.springsecurityapp.common.util.HttpRequestUtils;
+import com.paulstna.springsecurityapp.common.web.ClientIpResolver;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
@@ -26,6 +27,8 @@ public class RateLimiterFilter extends OncePerRequestFilter {
 
     private final IBucketService bucketService;
 
+    private final ClientIpResolver clientIpResolver;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -38,7 +41,7 @@ public class RateLimiterFilter extends OncePerRequestFilter {
             return;
         }
 
-        String key = endpoint + ":" + HttpRequestUtils.getClientIp(request);
+        String key = endpoint + ":" + clientIpResolver.resolve(request);
 
         Bucket bucket = bucketCache.get(key,
                 k -> bucketService.createBucket(endpoint));

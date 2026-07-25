@@ -16,7 +16,10 @@ import org.aspectj.lang.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -41,6 +44,9 @@ public class SecurityAuthAspect {
     void refreshToken() {
     }
 
+    @Pointcut("execution(public * com.paulstna.springsecurityapp.user.service.UserEntityServiceImpl.*(..))")
+    void userManagement() {
+    }
 
     @AfterThrowing(pointcut = "login()", throwing = "ex")
     public void handleLoginFailure(JoinPoint jp, Throwable ex) {
@@ -85,6 +91,31 @@ public class SecurityAuthAspect {
         logTokenFailure(username, ip, EventAction.REFRESH_TOKEN_FAILED, ex);
     }
 
+    @AfterThrowing(pointcut = "userManagement()", throwing = "ex")
+    public void handleAuthorizationDenied(AccessDeniedException ex) {
+        String username = currentUsername();
+
+        try {
+            // traceId, user and ip are already in the MDC for authenticated
+            // requests, so only the event keys are added and removed here.
+            MDC.put(MdcKeysConstants.EVENT_TYPE, EventType.SECURITY.name());
+            MDC.put(MdcKeysConstants.EVENT_ACTION, EventAction.AUTHORIZATION_DENIED.name());
+            MDC.put(MdcKeysConstants.EVENT_OUTCOME, EventOutcome.FAILURE.name());
+            MDC.put(MdcKeysConstants.FAILURE_REASON, FailureReason.INSUFFICIENT_PRIVILEGES.name());
+
+            SECURITY.warn("Authorization denied - User: {}, Detail: {}", username, ex.getMessage());
+        } finally {
+            MDC.remove(MdcKeysConstants.EVENT_TYPE);
+            MDC.remove(MdcKeysConstants.EVENT_ACTION);
+            MDC.remove(MdcKeysConstants.EVENT_OUTCOME);
+            MDC.remove(MdcKeysConstants.FAILURE_REASON);
+        }
+    }
+
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : "UNKNOWN";
+    }
 
     private void logAuthFailure(String username, String ip, EventAction action, Throwable ex) {
         FailureReason reason = mapFailureReason(ex);

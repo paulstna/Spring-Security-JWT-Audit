@@ -2,7 +2,7 @@ package com.paulstna.springsecurityapp.user.service;
 
 import com.paulstna.springsecurityapp.auth.domain.RegisterRequest;
 import com.paulstna.springsecurityapp.user.domain.UserEntity;
-import com.paulstna.springsecurityapp.user.dto.UserDto;
+import com.paulstna.springsecurityapp.user.dto.UserRequestDTO;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +11,7 @@ import java.util.UUID;
 public interface IUserEntityService {
     UserEntity buildUserEntityFromRequest(RegisterRequest request);
 
-    UserEntity createUser(UserDto userDto);
+    UserEntity createUser(UserRequestDTO userRequestDTO);
 
     UserEntity save(UserEntity user);
 
@@ -21,7 +21,7 @@ public interface IUserEntityService {
 
     List<UserEntity> findAll();
 
-    UserEntity update(UUID id, UserDto request);
+    UserEntity update(UUID id, UserRequestDTO request);
 
     void deleteById(UUID id);
 }

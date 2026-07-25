@@ -18,12 +18,4 @@ public class HttpRequestUtils {
 
         return normalized.substring(normalized.lastIndexOf('/') + 1);
     }
-
-    public String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(xForwardedFor)) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

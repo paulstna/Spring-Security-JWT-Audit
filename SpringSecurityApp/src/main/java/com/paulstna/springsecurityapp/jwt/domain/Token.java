@@ -16,8 +16,9 @@ import lombok.*;
 @AllArgsConstructor
 public class Token extends Auditable {
 
-    @Column(columnDefinition = "TEXT", unique = true, nullable = false)
-    private String jwtToken;
+    /** SHA-256 of the refresh token — never the token itself. */
+    @Column(length = 64, unique = true, nullable = false)
+    private String tokenHash;
 
     @Enumerated(EnumType.STRING)
     private TokenType tokenType = TokenType.REFRESH_TOKEN;

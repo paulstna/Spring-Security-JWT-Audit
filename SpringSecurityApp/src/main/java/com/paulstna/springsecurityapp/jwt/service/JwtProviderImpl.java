@@ -20,6 +20,8 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class JwtProviderImpl implements IJwtProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+
     private final JwtConfiguration jwtConfiguration;
 
     @Override
@@ -27,7 +29,7 @@ public class JwtProviderImpl implements IJwtProvider {
         return Jwts.builder()
                 .subject(username)
                 .claim("roles", roles.stream().map(role -> role.getRoleName().name()).toList())
-                .claim("token_type", TokenType.ACCESS_TOKEN.name())
+                .claim(TOKEN_TYPE_CLAIM, TokenType.ACCESS_TOKEN.name())
                 .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(Instant.now()
                         .plusSeconds(jwtConfiguration.getAuthTimeExpiration())))
@@ -40,7 +42,7 @@ public class JwtProviderImpl implements IJwtProvider {
         return Jwts.builder()
                 .subject(username)
                 .id(UUID.randomUUID().toString())
-                .claim("token_type", TokenType.REFRESH_TOKEN.name())
+                .claim(TOKEN_TYPE_CLAIM, TokenType.REFRESH_TOKEN.name())
                 .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(Instant.now()
                         .plusSeconds(jwtConfiguration.getRefreshTimeExpiration())))
@@ -51,6 +53,21 @@ public class JwtProviderImpl implements IJwtProvider {
     @Override
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    @Override
+    public TokenType extractTokenType(String token) {
+        String declaredType = extractClaim(token, claims -> claims.get(TOKEN_TYPE_CLAIM, String.class));
+        if (declaredType == null) {
+            return null;
+        }
+
+        try {
+            return TokenType.valueOf(declaredType);
+        } catch (IllegalArgumentException e) {
+            log.info("Unrecognised token_type claim: {}", declaredType);
+            return null;
+        }
     }
 
     @Override

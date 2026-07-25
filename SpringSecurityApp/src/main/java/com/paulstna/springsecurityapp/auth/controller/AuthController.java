@@ -5,7 +5,7 @@ import com.paulstna.springsecurityapp.auth.domain.AuthResponse;
 import com.paulstna.springsecurityapp.auth.domain.LoginRequest;
 import com.paulstna.springsecurityapp.auth.domain.RegisterRequest;
 import com.paulstna.springsecurityapp.auth.service.IAuthService;
-import com.paulstna.springsecurityapp.common.util.HttpRequestUtils;
+import com.paulstna.springsecurityapp.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +23,7 @@ import java.time.Duration;
 public class AuthController {
 
     private final IAuthService authService;
+    private final ClientIpResolver clientIpResolver;
 
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
@@ -38,7 +39,7 @@ public class AuthController {
                 authService.register(
                         registerRequest,
                         httpRequest.getHeader("User-Agent"),
-                        HttpRequestUtils.getClientIp(httpRequest)
+                        clientIpResolver.resolve(httpRequest)
                 );
 
         return ResponseEntity
@@ -60,7 +61,7 @@ public class AuthController {
                 authService.login(
                         loginRequest,
                         httpRequest.getHeader("User-Agent"),
-                        HttpRequestUtils.getClientIp(httpRequest)
+                        clientIpResolver.resolve(httpRequest)
                 );
 
         return ResponseEntity
@@ -81,7 +82,7 @@ public class AuthController {
         AuthInternalResponseDto authInternalResponseDto = authService.refreshToken(
                 refreshToken,
                 httpRequest.getHeader("User-Agent"),
-                HttpRequestUtils.getClientIp(httpRequest)
+                clientIpResolver.resolve(httpRequest)
         );
 
         return ResponseEntity

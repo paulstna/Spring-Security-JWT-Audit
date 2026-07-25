@@ -3,15 +3,17 @@ package com.paulstna.springsecurityapp.user.service;
 import com.paulstna.springsecurityapp.auth.domain.RegisterRequest;
 import com.paulstna.springsecurityapp.exception.ResourceAlreadyExistsException;
 import com.paulstna.springsecurityapp.exception.ResourceNotFoundException;
+import com.paulstna.springsecurityapp.security.authorization.IRoleAuthorizationService;
 import com.paulstna.springsecurityapp.user.domain.Role;
 import com.paulstna.springsecurityapp.user.domain.RoleName;
 import com.paulstna.springsecurityapp.user.domain.UserEntity;
-import com.paulstna.springsecurityapp.user.dto.UserDto;
+import com.paulstna.springsecurityapp.user.dto.UserRequestDTO;
 import com.paulstna.springsecurityapp.user.repository.RoleRepository;
 import com.paulstna.springsecurityapp.user.repository.UserEntityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
@@ -23,6 +25,7 @@ public class UserEntityServiceImpl implements IUserEntityService {
     private final UserEntityRepository userEntityRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final IRoleAuthorizationService roleAuthorizationService;
 
     @Override
     public UserEntity buildUserEntityFromRequest(RegisterRequest request) {
@@ -37,14 +40,15 @@ public class UserEntityServiceImpl implements IUserEntityService {
     }
 
     @Override
-    public UserEntity createUser(UserDto userDto) {
-        validateUsernameNotExists(userDto.getUsername());
+    @Transactional
+    public UserEntity createUser(UserRequestDTO userRequestDTO) {
+        validateUsernameNotExists(userRequestDTO.getUsername());
 
         UserEntity user = new UserEntity();
-        user.setUsername(userDto.getUsername());
-        user.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        user.setUsername(userRequestDTO.getUsername());
+        user.setPassword(passwordEncoder.encode(userRequestDTO.getPassword()));
 
-        Set<Role> roles = resolveRoles(userDto.getRoles());
+        Set<Role> roles = resolveRoles(userRequestDTO.getRoles());
         user.setRoles(roles);
 
         return userEntityRepository.save(user);
@@ -72,7 +76,8 @@ public class UserEntityServiceImpl implements IUserEntityService {
     }
 
     @Override
-    public UserEntity update(UUID id, UserDto request) {
+    @Transactional
+    public UserEntity update(UUID id, UserRequestDTO request) {
         UserEntity user = findById(id);
 
         if (!user.getUsername().equals(request.getUsername())) {
@@ -93,6 +98,7 @@ public class UserEntityServiceImpl implements IUserEntityService {
     }
 
     @Override
+    @Transactional
     public void deleteById(UUID id) {
         if (!userEntityRepository.existsById(id)) {
             throw new ResourceNotFoundException("User not found with id: " + id);
@@ -122,12 +128,23 @@ public class UserEntityServiceImpl implements IUserEntityService {
     }
 
     private Role findRoleByName(String roleName) {
+        RoleName requested = parseRoleName(roleName);
+        roleAuthorizationService.ensureCallerCanGrant(requested);
+
+        return roleRepository.findByRoleName(requested)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + requested.name()));
+    }
+
+    private RoleName parseRoleName(String roleName) {
         String normalizedName = roleName.toUpperCase().startsWith("ROLE_")
                 ? roleName.toUpperCase()
                 : "ROLE_" + roleName.toUpperCase();
 
-        return roleRepository.findByRoleName(RoleName.valueOf(normalizedName))
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + normalizedName));
+        try {
+            return RoleName.valueOf(normalizedName);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundException("Role not found: " + normalizedName);
+        }
     }
 
 }

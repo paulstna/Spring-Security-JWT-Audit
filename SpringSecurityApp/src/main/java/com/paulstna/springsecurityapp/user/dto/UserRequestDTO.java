@@ -4,7 +4,7 @@ import lombok.Getter;
 import java.util.Set;
 
 @Getter
-public class UserDto {
+public class UserRequestDTO {
     private String username;
     private String password;
     private Set<String> roles;
