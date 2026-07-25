@@ -1,0 +1,35 @@
+# Test profile. The datasource is supplied by Testcontainers at runtime; the
+# DB_* placeholders below only exist so the ones in application.yml resolve.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+
+app:
+  cookie:
+    # MockMvc has no TLS, so assertions read the cookie without a Secure flag.
+    secure: false
+  trust-proxy: false
+
+jwt:
+  # Test-only key, 512 bits Base64 encoded. Never used outside the test suite.
+  secret-key: dGVzdC1vbmx5LXNlY3JldC1rZXktZm9yLXRoZS1zcHJpbmctc2VjdXJpdHktand0LWF1ZGl0LXByb2plY3QtMTIzNDU2Nzg5MA==
+  auth-token:
+    expiration: 900
+  refresh-token:
+    expiration: 1296000
+
+DB_HOST: overridden-by-testcontainers
+DB_PORT: 0
+DB_NAME: overridden
+DB_USERNAME: overridden
+DB_PASSWORD: overridden
+
+logging:
+  level:
+    com.paulstna.springsecurityapp: WARN
+    org.testcontainers: WARN
+    org.flywaydb: WARN

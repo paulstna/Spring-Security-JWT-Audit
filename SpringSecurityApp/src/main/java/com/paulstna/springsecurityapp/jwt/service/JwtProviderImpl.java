@@ -96,7 +96,13 @@ public class JwtProviderImpl implements IJwtProvider {
 
     @Override
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(Date.from(Instant.now()));
+        try {
+            return extractExpiration(token).before(Date.from(Instant.now()));
+        } catch (ExpiredJwtException e) {
+            // Parsing an expired token throws instead of returning its claims, so
+            // without this the method could only ever return false or blow up.
+            return true;
+        }
     }
 
     @Override
