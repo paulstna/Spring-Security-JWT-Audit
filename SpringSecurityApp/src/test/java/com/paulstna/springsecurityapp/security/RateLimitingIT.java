@@ -35,7 +35,7 @@ class RateLimitingIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a rate limited response carries Retry-After and a JSON body")
+    @DisplayName("a rate limited response carries Retry-After and the standard error body")
     void rateLimitedResponseIsInformative() throws Exception {
         for (int attempt = 0; attempt < LOGIN_CAPACITY; attempt++) {
             attemptLogin(null);
@@ -48,7 +48,14 @@ class RateLimitingIT extends AbstractIntegrationTest {
                 .as("clients need to know how long to wait")
                 .isNotNull();
         assertThat(limited.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
-        assertThat(limited.getContentAsString()).contains("TOO_MANY_REQUESTS");
+
+        // The limiter is a filter, so this body used to have a shape of its own
+        // and a client had to parse two kinds of error.
+        assertThat(limited.getContentType()).contains(MediaType.APPLICATION_JSON_VALUE);
+        assertThat(limited.getContentAsString())
+                .contains("\"status\":429")
+                .contains("Rate limit exceeded")
+                .contains("\"path\":\"/api/v1/auth/login\"");
     }
 
     /**

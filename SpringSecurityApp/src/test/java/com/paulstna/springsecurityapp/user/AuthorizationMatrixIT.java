@@ -90,13 +90,34 @@ class AuthorizationMatrixIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("every /users endpoint refuses an anonymous caller")
+    @DisplayName("every /users endpoint refuses an anonymous caller with 401")
     void anonymousIsRefusedEverywhere() throws Exception {
-        mockMvc.perform(get("/api/v1/users")).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/v1/users/" + targetId)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/users")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/users/" + targetId)).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/v1/users").contentType(MediaType.APPLICATION_JSON)
-                .content("{}")).andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/v1/users/" + targetId)).andExpect(status().isForbidden());
+                .content("{}")).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/v1/users/" + targetId)).andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * The whole point of separating the two: a client can tell "refresh your
+     * token and try again" from "you will never be allowed to do this".
+     */
+    @Test
+    @DisplayName("401 means the credential failed, 403 means the role did")
+    void authenticationAndAuthorizationFailuresAreDistinct() throws Exception {
+        mockMvc.perform(get("/api/v1/users")
+                        .header(HttpHeaders.AUTHORIZATION, bearer("not-a-real-token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Authentication required"))
+                .andExpect(jsonPath("$.path").value("/api/v1/users"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/users")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessTokenFor(USER))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access denied"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 
     @Test

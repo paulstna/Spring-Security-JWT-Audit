@@ -35,8 +35,9 @@ class AccountStateIT extends AbstractIntegrationTest {
 
         setFlag("enabled", false, MANAGER);
 
+        // 401, not 403: the token no longer identifies anyone who may sign in.
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, bearer(token)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -48,7 +49,7 @@ class AccountStateIT extends AbstractIntegrationTest {
         setFlag("account_non_locked", false, MANAGER);
 
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, bearer(token)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

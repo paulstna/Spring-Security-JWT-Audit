@@ -1,0 +1,868 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "Spring Security JWT Audit API",
+    "description" : "REST API secured with JWT: a short-lived access token in the `Authorization` header and a long-lived refresh token in an `HttpOnly` cookie, rotated on every use.\n\n**Authenticating in this page**\n1. Call `POST /api/v1/auth/login` with one of the demo accounts (`admin` / `manager` / `user`, password `Demo1234!`).\n2. Copy `authToken` from the response.\n3. Click **Authorize** and paste it. The token is valid for 15 minutes.\n\nThe refresh cookie is set by the browser and scoped to `/api/v1/auth`, so `POST /api/v1/auth/refresh` works from this page without pasting anything.\n\n**Roles** are hierarchical: `SYSTEM` > `ADMIN` > `MANAGER` > `USER`. A role inherits every permission below it.\n\nAuthentication endpoints are rate limited per client IP and answer `429` with a `Retry-After` header once the limit is hit.",
+    "contact" : {
+      "name" : "PaulStna",
+      "url" : "https://github.com/PaulStna"
+    },
+    "license" : {
+      "name" : "MIT",
+      "url" : "https://opensource.org/licenses/MIT"
+    },
+    "version" : "v1"
+  },
+  "servers" : [ {
+    "url" : "/",
+    "description" : "This server"
+  } ],
+  "tags" : [ {
+    "name" : "Authentication",
+    "description" : "Obtaining, rotating and revoking tokens. The access token is returned in the body; the refresh token is set as an HttpOnly cookie scoped to /api/v1/auth and is rotated on every refresh."
+  }, {
+    "name" : "Users",
+    "description" : "User administration. Every operation needs an access token, and the required role is stated per operation. Roles are hierarchical, so ADMIN satisfies anything MANAGER can do."
+  } ],
+  "paths" : {
+    "/api/v1/users/{id}" : {
+      "get" : {
+        "tags" : [ "Users" ],
+        "summary" : "Get one user",
+        "description" : "Requires MANAGER.",
+        "operationId" : "findById",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The user.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No user with that id.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No access token, or it is invalid or expired.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Authenticated, but the role is not enough.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      },
+      "put" : {
+        "tags" : [ "Users" ],
+        "summary" : "Update a user",
+        "description" : "Requires MANAGER. Omit the password to keep the current one. The same ceiling on grantable roles applies as on create.",
+        "operationId" : "update",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "User updated.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The payload breaks a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No user with that id, or an unknown role.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The new username is already taken.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No access token, or it is invalid or expired.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Authenticated, but the role is not enough.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Users" ],
+        "summary" : "Delete a user",
+        "description" : "Requires ADMIN. Deletes the account and its sessions. Roles are a shared catalogue and are left untouched.",
+        "operationId" : "delete",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "User deleted."
+          },
+          "404" : {
+            "description" : "No user with that id.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No access token, or it is invalid or expired.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Authenticated, but the role is not enough.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/users" : {
+      "get" : {
+        "tags" : [ "Users" ],
+        "summary" : "List every user",
+        "description" : "Requires MANAGER.",
+        "operationId" : "findAll",
+        "responses" : {
+          "401" : {
+            "description" : "No access token, or it is invalid or expired.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Authenticated, but the role is not enough.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "All users. Password hashes are never included.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      },
+      "post" : {
+        "tags" : [ "Users" ],
+        "summary" : "Create a user",
+        "description" : "Requires ADMIN. Roles may only be granted up to the caller's own level, so an ADMIN cannot mint a SYSTEM account. Omitting roles gives USER.",
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "User created.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The payload breaks a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "One of the requested roles does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "That username is already taken.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "No access token, or it is invalid or expired.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Authenticated, but the role is not enough.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/auth/register" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Register a new account",
+        "description" : "Creates an account with the USER role and logs it in, so the caller gets a usable session straight away. The username must be free.",
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Account created and signed in.",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "Refresh token, HttpOnly, SameSite=Strict, scoped to /api/v1/auth.",
+                "style" : "simple",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The username or password breaks a rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "That username is already taken.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Rate limit exceeded for this client IP. Wait the number of seconds in the Retry-After header.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the next attempt is allowed.",
+                "schema" : { }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Exchange the refresh cookie for a new access token",
+        "description" : "Rotates the refresh token: the old one is revoked and a new cookie is issued, so a stolen token is usable at most once. The token is bound to the User-Agent that obtained it and is rejected from any other client.",
+        "operationId" : "refreshToken",
+        "responses" : {
+          "200" : {
+            "description" : "New access token, refresh token rotated.",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "Refresh token, HttpOnly, SameSite=Strict, scoped to /api/v1/auth.",
+                "style" : "simple",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Cookie missing, malformed, expired, already rotated, or presented by a different client. An access token is not accepted here.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Rate limit exceeded for this client IP. Wait the number of seconds in the Retry-After header.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the next attempt is allowed.",
+                "schema" : { }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "refreshCookie" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Sign out",
+        "description" : "Revokes the refresh token server side and clears the cookie. Already issued access tokens stay valid until they expire, which is why they are short lived. Signing out twice is not an error.",
+        "operationId" : "logout",
+        "responses" : {
+          "204" : {
+            "description" : "Session revoked and cookie cleared.",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "Same cookie with Max-Age=0, which deletes it.",
+                "style" : "simple",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "refreshCookie" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Sign in",
+        "description" : "Demo accounts: admin, manager and user, all with password Demo1234!. Any failure answers the same 401 so accounts cannot be enumerated; the real reason is recorded in the security log.",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Signed in.",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "Refresh token, HttpOnly, SameSite=Strict, scoped to /api/v1/auth.",
+                "style" : "simple",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Username or password missing.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Wrong credentials, unknown user, or a disabled or locked account.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Rate limit exceeded for this client IP. Wait the number of seconds in the Retry-After header.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the next attempt is allowed.",
+                "schema" : { }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Unexpected failure. The body carries a traceId that matches the log entry; no internal detail is exposed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "UserRequest" : {
+        "type" : "object",
+        "description" : "Payload for creating or updating a user. The password is required on create and optional on update, where omitting it keeps the current one.",
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "description" : "Username may only contain letters, digits, dots, underscores and hyphens",
+            "example" : "ada.lovelace",
+            "maxLength" : 50,
+            "minLength" : 3,
+            "pattern" : "^[a-zA-Z0-9._-]+$"
+          },
+          "password" : {
+            "type" : "string",
+            "format" : "password",
+            "description" : "Password must contain an uppercase letter, a lowercase letter, a digit and a special character. Omit on update to keep the current one.",
+            "example" : "Str0ng!Pass",
+            "maxLength" : 72,
+            "minLength" : 8,
+            "pattern" : "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z0-9]).+$"
+          },
+          "roles" : {
+            "type" : "array",
+            "description" : "Role names, with or without the ROLE_ prefix. Only roles at or below the caller's own level may be granted, so SYSTEM is never assignable. Omit for a plain USER.",
+            "example" : [ "MANAGER" ],
+            "items" : {
+              "type" : "string"
+            },
+            "uniqueItems" : true
+          }
+        },
+        "required" : [ "username" ]
+      },
+      "ErrorResponse" : {
+        "description" : "Every failure in this API has this shape.",
+        "properties" : {
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32",
+            "example" : 400
+          },
+          "message" : {
+            "type" : "string",
+            "description" : "Safe to show a user. Never carries a stack trace or internal detail.",
+            "example" : "Validation failed"
+          },
+          "path" : {
+            "type" : "string",
+            "example" : "/api/v1/users"
+          },
+          "traceId" : {
+            "type" : "string",
+            "description" : "The id this request was logged under. Quote it and the exact request can be found in the logs.",
+            "example" : "b8f1c2d3-4e5a-6b7c-8d9e-0f1a2b3c4d5e"
+          },
+          "fieldErrors" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string",
+              "description" : "Only present on a validation failure.",
+              "example" : "{\"password\":\"Password must be between 8 and 72 characters\"}"
+            },
+            "description" : "Only present on a validation failure.",
+            "example" : {
+              "password" : "Password must be between 8 and 72 characters"
+            }
+          }
+        }
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "description" : "A user as the API exposes it. Deliberately not the entity: the password hash and the session tokens have no field here to leak through.",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "example" : "6c2f1b7e-6f1a-4c3e-9f4a-2b8d5c1e7a90"
+          },
+          "username" : {
+            "type" : "string",
+            "example" : "ada.lovelace"
+          },
+          "roles" : {
+            "type" : "array",
+            "description" : "Granted roles, always prefixed with ROLE_.",
+            "example" : [ "ROLE_MANAGER" ],
+            "items" : {
+              "type" : "string"
+            },
+            "uniqueItems" : true
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "A disabled account cannot sign in, and its live tokens stop working."
+          },
+          "accountNonLocked" : {
+            "type" : "boolean",
+            "description" : "False once the account is locked. Same effect as disabling, different reason in the audit trail."
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "RegisterRequest" : {
+        "type" : "object",
+        "description" : "A new account. It always gets the USER role; roles cannot be requested here.",
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "description" : "Username may only contain letters, digits, dots, underscores and hyphens",
+            "example" : "ada.lovelace",
+            "maxLength" : 50,
+            "minLength" : 3,
+            "pattern" : "^[a-zA-Z0-9._-]+$"
+          },
+          "password" : {
+            "type" : "string",
+            "format" : "password",
+            "description" : "Password must contain an uppercase letter, a lowercase letter, a digit and a special character. Capped at 72 bytes because BCrypt silently ignores anything past that.",
+            "example" : "Str0ng!Pass",
+            "maxLength" : 72,
+            "minLength" : 8,
+            "pattern" : "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z0-9]).+$"
+          }
+        },
+        "required" : [ "password", "username" ]
+      },
+      "AuthResponse" : {
+        "type" : "object",
+        "description" : "The access token. The refresh token is not in the body: it travels only in an HttpOnly cookie, out of reach of JavaScript.",
+        "properties" : {
+          "authToken" : {
+            "type" : "string",
+            "description" : "Signed JWT for the Authorization header. Valid for 15 minutes.",
+            "example" : "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbIlJPTEVfQURNSU4iXX0.MYPS8g"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "description" : "Credentials. No format rules are applied here on purpose: rejecting a malformed username early would tell an attacker it cannot exist.",
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "example" : "admin",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "format" : "password",
+            "example" : "Demo1234!",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "password", "username" ]
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "Access token returned by `/auth/login`. Paste the raw token; the `Bearer ` prefix is added for you.",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      },
+      "refreshCookie" : {
+        "type" : "apiKey",
+        "description" : "Set by `/auth/login` and `/auth/register`. `HttpOnly`, so it cannot be read from JavaScript, and sent only to `/api/v1/auth`.",
+        "name" : "refreshToken",
+        "in" : "cookie"
+      }
+    }
+  }
+}

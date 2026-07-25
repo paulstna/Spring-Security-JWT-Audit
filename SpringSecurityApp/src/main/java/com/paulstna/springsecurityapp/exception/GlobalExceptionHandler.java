@@ -1,7 +1,7 @@
 package com.paulstna.springsecurityapp.exception;
 
 import com.paulstna.springsecurityapp.audit.constants.MdcKeysConstants;
-import com.paulstna.springsecurityapp.exception.dto.ErrorResponseDto;
+import com.paulstna.springsecurityapp.exception.dto.ErrorResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -29,43 +29,43 @@ import java.util.Map;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponseDto> handleResourceNotFound(
+    public ResponseEntity<ErrorResponseDTO> handleResourceNotFound(
             ResourceNotFoundException e, HttpServletRequest request) {
         return respond(HttpStatus.NOT_FOUND, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(ResourceAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponseDto> handleResourceAlreadyExists(
+    public ResponseEntity<ErrorResponseDTO> handleResourceAlreadyExists(
             ResourceAlreadyExistsException e, HttpServletRequest request) {
         return respond(HttpStatus.CONFLICT, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<ErrorResponseDto> handleInvalidToken(
+    public ResponseEntity<ErrorResponseDTO> handleInvalidToken(
             InvalidTokenException e, HttpServletRequest request) {
         return respond(HttpStatus.UNAUTHORIZED, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(TokenRequiredException.class)
-    public ResponseEntity<ErrorResponseDto> handleTokenRequired(
+    public ResponseEntity<ErrorResponseDTO> handleTokenRequired(
             TokenRequiredException e, HttpServletRequest request) {
         return respond(HttpStatus.BAD_REQUEST, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponseDto> handleAccessDenied(
+    public ResponseEntity<ErrorResponseDTO> handleAccessDenied(
             AccessDeniedException e, HttpServletRequest request) {
         return respond(HttpStatus.FORBIDDEN, e.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler({BadCredentialsException.class, AccountStatusException.class})
-    public ResponseEntity<ErrorResponseDto> handleFailedAuthentication(
+    public ResponseEntity<ErrorResponseDTO> handleFailedAuthentication(
             AuthenticationException e, HttpServletRequest request) {
         return respond(HttpStatus.UNAUTHORIZED, "Bad credentials", request.getRequestURI());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponseDto> handleUnexpected(
+    public ResponseEntity<ErrorResponseDTO> handleUnexpected(
             Exception e, HttpServletRequest request) {
         log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), e);
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", request.getRequestURI());
@@ -91,20 +91,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception ex, Object responseBody, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
 
-        Object payload = responseBody instanceof ErrorResponseDto
+        Object payload = responseBody instanceof ErrorResponseDTO
                 ? responseBody
                 : body(status, reasonPhrase(status), pathOf(request), null);
 
         return super.handleExceptionInternal(ex, payload, headers, status, request);
     }
 
-    private ResponseEntity<ErrorResponseDto> respond(HttpStatus status, String message, String path) {
+    private ResponseEntity<ErrorResponseDTO> respond(HttpStatus status, String message, String path) {
         return ResponseEntity.status(status).body(body(status, message, path, null));
     }
 
-    private ErrorResponseDto body(HttpStatusCode status, String message, String path,
+    private ErrorResponseDTO body(HttpStatusCode status, String message, String path,
                                   Map<String, String> fieldErrors) {
-        return ErrorResponseDto.builder()
+        return ErrorResponseDTO.builder()
                 .timestamp(Instant.now())
                 .status(status.value())
                 .message(message)

@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.paulstna.springsecurityapp.bucket.service.IBucketService;
 import com.paulstna.springsecurityapp.common.util.HttpRequestUtils;
 import com.paulstna.springsecurityapp.common.web.ClientIpResolver;
+import com.paulstna.springsecurityapp.exception.ErrorResponseWriter;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
@@ -11,8 +12,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -28,6 +29,8 @@ public class RateLimiterFilter extends OncePerRequestFilter {
     private final IBucketService bucketService;
 
     private final ClientIpResolver clientIpResolver;
+
+    private final ErrorResponseWriter errorResponseWriter;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -51,25 +54,20 @@ public class RateLimiterFilter extends OncePerRequestFilter {
         if (probe.isConsumed()) {
             filterChain.doFilter(request, response);
         } else {
-            sendRateLimitExceededResponse(response, probe);
+            sendRateLimitExceededResponse(request, response, probe);
         }
     }
 
-    private void sendRateLimitExceededResponse(HttpServletResponse response,
+    private void sendRateLimitExceededResponse(HttpServletRequest request,
+                                               HttpServletResponse response,
                                                ConsumptionProbe probe)
             throws IOException {
         long waitTime = TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill());
 
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setHeader("Retry-After", String.valueOf(waitTime));
+        response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(waitTime));
         response.setHeader("X-RateLimit-Remaining", "0");
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        response.getWriter().write(String.format("""
-                {
-                  "error": "TOO_MANY_REQUESTS",
-                  "message": "Rate limit exceeded. Retry after %d seconds"
-                }
-                """, waitTime));
+        errorResponseWriter.write(request, response, HttpStatus.TOO_MANY_REQUESTS,
+                "Rate limit exceeded. Retry after " + waitTime + " seconds");
     }
 }

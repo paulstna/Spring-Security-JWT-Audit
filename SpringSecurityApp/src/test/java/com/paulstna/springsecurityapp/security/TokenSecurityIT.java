@@ -36,7 +36,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
         String refreshToken = refreshTokenFor(MANAGER);
 
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, bearer(refreshToken)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -63,7 +63,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
     @DisplayName("malformed credentials never authenticate")
     void malformedTokensAreRefused(String token) throws Exception {
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, bearer(token)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -71,7 +71,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
     void nonBearerSchemeIsIgnored() throws Exception {
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION, "Basic " + accessTokenFor(MANAGER)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     /**
@@ -89,7 +89,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION,
                                 bearer(parts[0] + "." + parts[1] + "." + B64.encodeToString(signature))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -102,7 +102,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(parts[0] + "." + escalated + "." + parts[2])))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -121,7 +121,7 @@ class TokenSecurityIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(signingInput + "." + forged)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -132,6 +132,6 @@ class TokenSecurityIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(header + "." + parts[1] + ".")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

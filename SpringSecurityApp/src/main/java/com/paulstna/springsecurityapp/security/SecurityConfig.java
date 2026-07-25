@@ -33,9 +33,21 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    /**
+     * The API documentation. Public on purpose: this is a demo deployment and
+     * Swagger UI is its front door. Turn it off with
+     * {@code springdoc.api-docs.enabled=false} and these paths stop existing.
+     */
+    private static final String[] API_DOCS = {
+            "/v3/api-docs", "/v3/api-docs/**",
+            "/swagger-ui.html", "/swagger-ui/**"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimiterFilter rateLimiterFilter;
     private final MdcFilter mdcFilter;
+    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -45,6 +57,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                                .requestMatchers(API_DOCS).permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/v1/users", "/api/v1/users/**").hasRole("MANAGER")
                                 .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("MANAGER")
@@ -56,6 +69,12 @@ public class SecurityConfig {
                                         "/api/v1/auth/logout").permitAll()
                                 .anyRequest().authenticated()
                 )
+                // Without these, everything the filter chain rejects comes back as a
+                // bodiless 403, whether the caller failed to authenticate or merely
+                // lacks the role.
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(rateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(mdcFilter, UsernamePasswordAuthenticationFilter.class);
