@@ -6,6 +6,7 @@ import com.paulstna.springsecurityapp.audit.enums.EventType;
 import com.paulstna.springsecurityapp.audit.enums.FailureReason;
 import com.paulstna.springsecurityapp.audit.enums.Severity;
 import com.paulstna.springsecurityapp.exception.*;
+import io.jsonwebtoken.JwtException;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Aspect;
@@ -142,8 +143,12 @@ public class ErrorLoggingAspect {
                 ex instanceof InvalidTokenException ||
                 ex instanceof TokenRequiredException ||
                 ex instanceof ResourceNotFoundException ||
+                ex instanceof ResourceAlreadyExistsException ||
                 ex instanceof LockedException ||
-                ex instanceof DisabledException;
+                ex instanceof DisabledException ||
+                // Malformed, expired or badly signed tokens are the client's
+                // doing, not a fault of this service.
+                ex instanceof JwtException;
     }
 
     private void clearMDC() {

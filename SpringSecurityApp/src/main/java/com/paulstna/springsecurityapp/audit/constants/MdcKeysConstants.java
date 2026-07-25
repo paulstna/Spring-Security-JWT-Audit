@@ -5,6 +5,7 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public final class MdcKeysConstants {
 
+    public final String TRACE_ID = "traceId";
     public final String USER = "user";
     public final String IP = "ip";
 

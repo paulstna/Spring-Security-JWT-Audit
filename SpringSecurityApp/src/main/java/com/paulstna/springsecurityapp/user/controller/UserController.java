@@ -1,5 +1,7 @@
 package com.paulstna.springsecurityapp.user.controller;
 
+import com.paulstna.springsecurityapp.common.validation.ValidationGroups.OnCreate;
+import com.paulstna.springsecurityapp.common.validation.ValidationGroups.OnUpdate;
 import com.paulstna.springsecurityapp.user.dto.UserRequestDTO;
 import com.paulstna.springsecurityapp.user.dto.UserResponseDTO;
 import com.paulstna.springsecurityapp.user.mapper.UserMapper;
@@ -7,6 +9,7 @@ import com.paulstna.springsecurityapp.user.service.IUserEntityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,14 +33,17 @@ public class UserController {
     }
 
     @PostMapping(version = "v1")
-    public ResponseEntity<UserResponseDTO> create(@RequestBody UserRequestDTO userRequestDTO) {
+    public ResponseEntity<UserResponseDTO> create(
+            @Validated(OnCreate.class) @RequestBody UserRequestDTO userRequestDTO) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(UserMapper.toResponse(userEntityService.createUser(userRequestDTO)));
     }
 
     @PutMapping(path = "/{id}", version = "v1")
-    public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id, @RequestBody UserRequestDTO userRequestDTO) {
+    public ResponseEntity<UserResponseDTO> update(
+            @PathVariable UUID id,
+            @Validated(OnUpdate.class) @RequestBody UserRequestDTO userRequestDTO) {
         return ResponseEntity.ok(UserMapper.toResponse(userEntityService.update(id, userRequestDTO)));
     }
 

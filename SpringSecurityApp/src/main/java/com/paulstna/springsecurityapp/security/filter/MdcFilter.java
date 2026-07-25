@@ -26,7 +26,7 @@ public class MdcFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try {
-            MDC.put("traceId", UUID.randomUUID().toString());
+            MDC.put(MdcKeysConstants.TRACE_ID, UUID.randomUUID().toString());
             // Every request-scoped log line carries the caller IP, so security
             // events outside the auth flow are still attributable.
             MDC.put(MdcKeysConstants.IP, clientIpResolver.resolve(request));

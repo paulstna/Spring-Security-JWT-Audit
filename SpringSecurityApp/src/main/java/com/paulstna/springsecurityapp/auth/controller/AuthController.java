@@ -7,6 +7,7 @@ import com.paulstna.springsecurityapp.auth.domain.RegisterRequest;
 import com.paulstna.springsecurityapp.auth.service.IAuthService;
 import com.paulstna.springsecurityapp.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -33,7 +34,7 @@ public class AuthController {
 
     @PostMapping(path = "/register", version = "v1")
     public ResponseEntity<AuthResponse> register(
-            @RequestBody RegisterRequest registerRequest,
+            @Valid @RequestBody RegisterRequest registerRequest,
             HttpServletRequest httpRequest) {
         AuthInternalResponseDto authInternalResponseDto =
                 authService.register(
@@ -54,7 +55,7 @@ public class AuthController {
 
     @PostMapping(path = "/login", version = "v1")
     public ResponseEntity<AuthResponse> login(
-            @RequestBody LoginRequest loginRequest,
+            @Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest httpRequest) {
 
         AuthInternalResponseDto authInternalResponseDto =

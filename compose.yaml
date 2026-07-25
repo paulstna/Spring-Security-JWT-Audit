@@ -29,7 +29,9 @@ services:
         # Demo users (admin/manager/user) are seeded by Flyway in every profile.
         # 'dev'  -> refresh cookie over plain HTTP + DEBUG logging (local testing).
         # 'prod' -> HTTPS-only cookie + INFO logging.
-        SPRING_PROFILES_ACTIVE: prod
+        # Set in .env, like every other variable here. Defaults to prod so a
+        # missing entry can never silently downgrade cookie security.
+        SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
         DB_HOST: postgresdb
         DB_PORT: 5432
         DB_NAME: ${DB_NAME}

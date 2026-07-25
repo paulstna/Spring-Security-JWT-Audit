@@ -20,8 +20,11 @@ public class Token extends Auditable {
     @Column(length = 64, unique = true, nullable = false)
     private String tokenHash;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     private TokenType tokenType = TokenType.REFRESH_TOKEN;
+
+    @Builder.Default
     private boolean revoked = false;
 
     @Column(nullable = false)
