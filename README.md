@@ -1,156 +1,255 @@
-# Spring Security-JWT-Audit Application
+# Spring Security JWT Audit
 
-This project demonstrates a secure REST API built with Spring Boot, featuring JWT-based authentication with access tokens and secure refresh tokens stored in HTTP-only cookies, role-based authorization, rate limiting, centralized exception handling, and auditing/logging mechanisms using Aspect-Oriented Programming (AOP), designed as a production-ready backend foundation.
+A stateless REST API built to get the security details right, and to prove it:
+JWT authentication with rotating refresh tokens in `HttpOnly` cookies,
+hierarchical role authorization, per-IP rate limiting, and an audit trail that
+records who did what, from where, and whether it worked.
 
-## **Technologies**
+![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot 4.0](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-165%20passing-success)
+![Coverage](https://img.shields.io/badge/coverage-82.7%25-success)
 
-- **Java 21**
-- **Spring Boot 4.x**: Foundation framework for application development.
-- **Spring Security**: Manages user authentication and access control.
-- **Spring Data JPA**: Streamlines data persistence and database operations.
-- **JWT (JSON Web Tokens)**: Provides stateless authentication mechanism.
-- **io.jsonwebtoken (JJWT)**: Library for generating and validating JWT tokens.
-- **Lombok**: Minimizes repetitive Java code through annotations.
-- **PostgreSQL 17**: Primary database for data storage and management.
-- **Bucket4j**: Controls API request frequency through rate limiting.
-- **Caffeine**: Delivers fast in-memory data caching capabilities.
-- **Docker + Docker Compose**: Ensures consistent application packaging and orchestration.
+---
 
-## **Core Features**
-
-### **Authentication & Authorization**
-- JWT-based stateless authentication (access + refresh tokens)
-- User registration, login, logout with token management
-- Role-based authorization: SYSTEM → ADMIN → MANAGER → USER
-- Automatic token rotation and device tracking
-- Secure HTTP-only cookies (SameSite=Strict)
-
-### **Security & Rate Limiting**
-- Endpoint-specific rate limiting with Bucket4j
-- IP-based throttling with configurable buckets
-- BCrypt password encoding
-- Token revocation and session management
-- One active session per device
-
-### **Audit & Logging**
-- Multi-logger architecture (AUDIT, SECURITY, ERROR, APP)
-- AOP-based auditing with MDC context enrichment
-- Automatic entity auditing (CreatedAt, UpdatedAt, CreatedBy, UpdatedBy)
-- Structured logging with rotation and retention policies
-
-### **User Management**
-- Role-based CRUD operations
-- Username uniqueness validation
-- Automatic password hashing
-- Cascade token cleanup on user deletion
-
-### **Infrastructure**
-- PostgreSQL database with JPA
-- Docker multi-stage builds with health checks
-- Docker Compose orchestration
-- API versioning (/api/{version}/...)
-
-## **Setup and Installation**
-
-### **Prerequisites**
-- Docker
-- Docker Compose
-
-### **Getting Started**
-
-#### **1. Clone the Repository**
+## Try it in two minutes
 
 ```bash
 git clone https://github.com/PaulStna/Spring-Security-JWT-Audit.git
 cd Spring-Security-JWT-Audit
-```
-
-#### **2. Run with Docker Compose**
-
-```bash
+cp .env.example .env      # generate your own JWT_SECRET_KEY, see below
 docker compose up -d
 ```
 
-The application will start on `http://localhost:8080`
+Open **<http://localhost:8080/swagger-ui.html>**.
 
-## **API Documentation**
+1. `POST /api/v1/auth/login` → **Try it out**. The body is pre-filled with a
+   demo account.
+2. Copy `authToken` from the response.
+3. **Authorize** (top right) → paste it.
+4. `GET /api/v1/users` now answers `200`.
 
-### **Authentication Endpoints**
+| Account | Role | Password |
+|---|---|---|
+| `admin` | `ADMIN` | `Demo1234!` |
+| `manager` | `MANAGER` | `Demo1234!` |
+| `user` | `USER` | `Demo1234!` |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Register a new user account |
-| `POST` | `/api/v1/auth/login` | Authenticate user and receive tokens |
-| `POST` | `/api/v1/auth/refresh` | Refresh access token using refresh token cookie |
-| `POST` | `/api/v1/auth/logout` | Invalidate session and clear tokens |
+Seeded by a Flyway migration in every profile, so the deployed stack is
+explorable without anyone handing over credentials. See
+[demo posture](docs/SECURITY.md#demo-posture) for what that means and how to
+turn it off.
 
-**Request Body (register/login):**
-```json
-{
-  "username": "<username>",
-  "password": "<plain_password>"
-}
+Generate a signing key with:
+
+```bash
+openssl rand -base64 64
 ```
 
-**Response (register/login/refresh):**
-```json
-{
-  "authToken": "<jwt_auth_token>"
-}
-```
-**+ Cookie:** `refreshToken` (HTTP-only, Secure, SameSite=Strict, 15 days)
-
-**Notes:**
-- **register/login**: Creates new session, sets `refreshToken` cookie, tracks device and IP
-- **refresh**: Requires `refreshToken` cookie, returns new access token and rotates refresh token
-- **logout**: Requires `refreshToken` cookie, invalidates session and deletes cookie
+The secret is read as Base64. Use at least 64 bytes: JJWT picks the strongest
+algorithm the key supports, so a shorter one quietly signs with HS384 instead of
+HS512.
 
 ---
 
-### **User Management Endpoints**
+## What is interesting here
 
-| Method | Endpoint | Description | Required Role |
-|--------|----------|-------------|---------------|
-| `GET` | `/api/v1/users` | Get all users | `MANAGER` |
-| `GET` | `/api/v1/users/{id}` | Get user by ID | `MANAGER` |
-| `POST` | `/api/v1/users` | Create new user | `ADMIN` |
-| `PUT` | `/api/v1/users/{id}` | Update user | `MANAGER` |
-| `DELETE` | `/api/v1/users/{id}` | Delete user | `ADMIN` |
+**Refresh tokens rotate and are stored hashed.** Every refresh deletes the old
+row before issuing the new one, so a stolen token works at most once — and only
+from the client that obtained it, since sessions are bound to the User-Agent.
+The database holds `SHA-256(token)`, so a dump contains nothing replayable.
 
-**Authentication:** All endpoints require `Authorization: Bearer <access_token>` header
+**Tokens declare their type.** An access token is refused at `/auth/refresh`,
+and a refresh token is refused as a bearer credential. Without that check a
+refresh token authenticates any request, turning a 15-minute session into a
+15-day one and skipping rotation entirely.
 
-**Request Body (POST/PUT):**
-```json
-{
-  "username": "<username>",
-  "password": "<plain_password>",
-  "roles": ["USER", "MANAGER"]
-}
-```
+**`401` and `403` mean different things.** One says refresh your token and
+retry; the other says you will never be allowed. Both carry the same JSON body
+as every other failure, `traceId` included — including the ones produced by
+filters, which normally escape `@ControllerAdvice` and come back empty.
 
-**Notes:**
-- `{id}` is a UUID path parameter
-- DELETE automatically revokes all user tokens and sessions
+**Failed logins are indistinguishable.** Wrong password, unknown user, disabled
+account and locked account all answer the same `401`. Account state is checked
+before the password, so a specific message would confirm the username exists.
+The real reason goes to `security.log`.
+
+**Roles have a ceiling.** A caller may only grant roles at or below their own
+level, so an `ADMIN` cannot mint a `SYSTEM` account. Attempts are recorded as
+security events, not swallowed as unexpected errors.
+
+**The audit trail is classified, and tested as such.** A duplicate username is a
+client mistake and stays out of `error.log`; a privilege escalation attempt
+lands in `security.log` with its MDC intact. `AuditLoggingIT` asserts which file
+each event reaches — because a log that fills with normal client behaviour stops
+being read.
 
 ---
 
-## **Security Notes**
+## Endpoints
 
-- All authentication endpoints track User-Agent and IP address for security auditing
-- Refresh tokens are bound to specific devices (one active session per device)
-- Rate limiting applies to all authentication endpoints based on endpoint + IP address
-- Passwords are automatically hashed using BCrypt
+Full contract: [Swagger UI](http://localhost:8080/swagger-ui.html) when running,
+or the committed [`docs/openapi.json`](docs/openapi.json).
 
-## Demo / Development Considerations
-The following configurations are **intentionally insecure** and exist **only for local testing and demonstration purposes**:
+### Authentication
 
-- The `.env` file is committed and exposed to simplify application setup
-- Default system/admin/manager users use `{noop}` password encoding
-- User-related endpoint responses may expose sensitive fields (e.g. password, audit metadata) **solely to demonstrate auditing and security mechanisms**
-- Secrets and credentials **must be externalized** and properly secured in real environments
+| | Endpoint | Notes |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Creates a `USER` account and signs it in |
+| `POST` | `/api/v1/auth/login` | Returns an access token, sets the refresh cookie |
+| `POST` | `/api/v1/auth/refresh` | Rotates the refresh token, returns a new access token |
+| `POST` | `/api/v1/auth/logout` | Revokes the session, clears the cookie |
 
-## **Further Development**
-- Input validation & sanitization
-- Testing suite
-- Monitoring & observability
-- Enhanced error handling
+All four are rate limited per client IP and answer `429` with `Retry-After`.
+
+### Users
+
+Every operation needs `Authorization: Bearer <token>`. Roles are hierarchical,
+so `ADMIN` satisfies anything `MANAGER` can do.
+
+| | Endpoint | Requires |
+|---|---|---|
+| `GET` | `/api/v1/users` | `MANAGER` |
+| `GET` | `/api/v1/users/{id}` | `MANAGER` |
+| `POST` | `/api/v1/users` | `ADMIN` |
+| `PUT` | `/api/v1/users/{id}` | `MANAGER` |
+| `DELETE` | `/api/v1/users/{id}` | `ADMIN` |
+
+### One error shape
+
+```json
+{
+  "timestamp": "2026-07-25T23:22:14.883Z",
+  "status": 401,
+  "message": "Authentication required",
+  "path": "/api/v1/users",
+  "traceId": "f06d14a1-1dee-454f-9822-6b3d0c18a985"
+}
+```
+
+`fieldErrors` is added on a validation failure. The `traceId` matches the log
+entry, so a caller can quote it and the exact request is one `grep` away.
+
+---
+
+## Postman
+
+Import both files from [`postman/`](postman):
+
+```
+postman/Spring-Security-JWT-Audit.postman_collection.json
+postman/environment.demo.json
+```
+
+Select the environment, run **Auth → Login (admin)**, and every other request is
+authenticated: the login test script stores the token, so nothing is copied by
+hand. The refresh token is never handled manually either — it arrives in an
+`HttpOnly` cookie and Postman's cookie jar sends it back.
+
+It is not a click-through. All 21 requests carry assertions, so running the
+whole collection is a live check of the API:
+
+```bash
+newman run postman/Spring-Security-JWT-Audit.postman_collection.json \
+       -e postman/environment.demo.json
+# 22 requests, 57 assertions, 0 failures
+```
+
+The **Failure cases** folder is the interesting half: `401` versus `403`, a
+refresh token refused as a bearer, an `ADMIN` unable to mint a `SYSTEM` account,
+two failed logins proven byte-identical, and a validation error listing its
+fields. Each one documents a control that exists for a reason.
+
+**Rate limiting** is last on purpose — it calls itself until the login bucket is
+empty, then asserts the `429` and its `Retry-After`. Wait a minute before
+signing in again.
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| [Architecture](docs/architecture.md) | How a request travels, package layout, profiles |
+| [Authentication flows](docs/auth-flow.md) | Login, refresh rotation and logout, step by step |
+| [Data model](docs/er-diagram.md) | Schema, and why each column is what it is |
+| [Security model](docs/SECURITY.md) | Threats, controls, and what is **not** covered |
+| [Design decisions](docs/adr/README.md) | ADRs: the alternatives and what each choice costs |
+
+---
+
+## Running the tests
+
+```bash
+cd SpringSecurityApp
+./mvnw test      # unit tests only, no Docker needed
+./mvnw verify    # everything, including integration tests
+```
+
+`verify` needs Docker running: integration tests start a real **PostgreSQL 17**
+container, the same image `compose.yaml` uses. Not H2 — that way the Flyway
+migrations, the `ddl-auto=validate` check and Postgres-specific SQL are all
+exercised as deployed.
+
+```
+165 tests · 82.7% instructions · 71.4% branches · 84.5% lines
+```
+
+JaCoCo fails the build below 75% / 65%. The report lands in
+`target/site/jacoco/index.html`.
+
+Every regression found while hardening this project has a test that documents
+why it exists: the refresh token refused as a bearer, `/users/{id}` protected,
+the role catalogue surviving a user deletion, identical answers for every failed
+login, `X-Forwarded-For` not buying extra attempts.
+
+---
+
+## Stack
+
+**Java 21** · **Spring Boot 4.0** · Spring Security · Spring Data JPA ·
+**PostgreSQL 17** · Flyway · JJWT · Bucket4j + Caffeine · AspectJ · Logback ·
+springdoc-openapi · Testcontainers · JaCoCo · Docker Compose
+
+---
+
+## Configuration
+
+Everything comes from `.env`; `.env.example` is the template.
+
+| Variable | Default | |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | `dev` allows the cookie over plain HTTP and logs at `DEBUG` |
+| `JWT_SECRET_KEY` | — | Required, Base64. `openssl rand -base64 64` |
+| `JWT_AUTH_EXPIRATION` | `900` | Access token lifetime, seconds |
+| `JWT_REFRESH_EXPIRATION` | `1296000` | Refresh token lifetime, seconds |
+| `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` | — | PostgreSQL credentials |
+
+The profile defaults to `prod` on purpose: a missing entry can never silently
+downgrade cookie security.
+
+Rate limits and the endpoints they apply to live in `application.yml` under
+`bucket`. `app.trust-proxy` (default `false`) controls whether
+`X-Forwarded-For` is honoured — leave it off unless a proxy overwrites the
+header, or the limiter can be bypassed by rotating it.
+
+---
+
+## Logs
+
+Mounted at `./logs`, one file per concern, each with the retention its content
+deserves.
+
+| | Contains | Kept |
+|---|---|---|
+| `audit.log` | Successful auth events | 365 days |
+| `security.log` | Failed logins, denied authorization, rate limits hit | 180 days |
+| `error.log` | Genuine faults only | 90 days |
+| `app.log` | Everything | 30 days |
+
+---
+
+## License
+
+MIT.
