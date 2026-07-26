@@ -1,0 +1,43 @@
+version: 2
+
+# A dependency with a published CVE is the most likely way this project becomes
+# insecure without anyone changing a line of it.
+updates:
+  - package-ecosystem: maven
+    directory: /SpringSecurityApp
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Boot manages most versions, so its updates arrive together. One PR to
+      # review and one CI run, instead of a dozen that only make sense as a set.
+      spring:
+        patterns:
+          - org.springframework*
+      test-tooling:
+        patterns:
+          - org.testcontainers:*
+          - org.jacoco:*
+          - org.apache.maven.plugins:maven-*failsafe*
+          - org.apache.maven.plugins:maven-*surefire*
+    labels:
+      - dependencies
+
+  # The base images in the Dockerfile age too, and a JRE with a known CVE is
+  # just as exploitable as a library with one.
+  - package-ecosystem: docker
+    directory: /SpringSecurityApp
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
+  # Actions are third-party code running with a token. They get pinned and
+  # updated like anything else.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies

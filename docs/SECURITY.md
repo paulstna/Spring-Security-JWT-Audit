@@ -159,7 +159,7 @@ hidden:
 The controls above are not claims; each has a test that fails if it regresses.
 
 ```
-165 tests · 82.7% instructions · 71.4% branches
+166 tests · 83.1% instructions · 71.6% branches
 ```
 
 The security-relevant suites, all running against a real PostgreSQL container:

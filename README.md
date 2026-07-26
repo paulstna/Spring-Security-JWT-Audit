@@ -5,11 +5,13 @@ JWT authentication with rotating refresh tokens in `HttpOnly` cookies,
 hierarchical role authorization, per-IP rate limiting, and an audit trail that
 records who did what, from where, and whether it worked.
 
+[![CI](https://github.com/PaulStna/Spring-Security-JWT-Audit/actions/workflows/ci.yml/badge.svg)](https://github.com/PaulStna/Spring-Security-JWT-Audit/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/PaulStna/Spring-Security-JWT-Audit/actions/workflows/codeql.yml/badge.svg)](https://github.com/PaulStna/Spring-Security-JWT-Audit/actions/workflows/codeql.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot 4.0](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F?logo=springboot&logoColor=white)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-165%20passing-success)
-![Coverage](https://img.shields.io/badge/coverage-82.7%25-success)
+![Tests](https://img.shields.io/badge/tests-166%20passing-success)
+![Coverage](https://img.shields.io/badge/coverage-83%25-success)
 
 ---
 
@@ -44,12 +46,15 @@ turn it off.
 Generate a signing key with:
 
 ```bash
-openssl rand -base64 64
+openssl rand -base64 64 | tr -d '\r\n'
 ```
 
-The secret is read as Base64. Use at least 64 bytes: JJWT picks the strongest
-algorithm the key supports, so a shorter one quietly signs with HS384 instead of
-HS512.
+The secret is read as Base64. Two details bite here. Openssl wraps base64 at 64
+characters, and on Git Bash for Windows it ends lines with CRLF, so without
+stripping both the value spans two lines or hides a carriage return and the
+application refuses to start with `Illegal base64 character`. And it needs to be
+at least 64 bytes: JJWT picks the strongest algorithm a key supports, so a
+shorter one quietly signs with HS384 instead of HS512.
 
 ---
 
@@ -193,16 +198,47 @@ migrations, the `ddl-auto=validate` check and Postgres-specific SQL are all
 exercised as deployed.
 
 ```
-165 tests · 82.7% instructions · 71.4% branches · 84.5% lines
+166 tests · 83.1% instructions · 71.6% branches · 85.0% lines
 ```
 
-JaCoCo fails the build below 75% / 65%. The report lands in
-`target/site/jacoco/index.html`.
+JaCoCo fails the build below 75% / 65%, in CI as well as locally, so the number
+above cannot quietly rot. The report lands in `target/site/jacoco/index.html`.
 
 Every regression found while hardening this project has a test that documents
 why it exists: the refresh token refused as a bearer, `/users/{id}` protected,
 the role catalogue surviving a user deletion, identical answers for every failed
 login, `X-Forwarded-For` not buying extra attempts.
+
+---
+
+## Continuous integration
+
+Two jobs, answering two different questions.
+
+**Build and test** runs `./mvnw verify` — the 166 tests, against a real
+PostgreSQL container, with the coverage gate enforced. Coverage lands in the run
+summary; on a failure the surefire and failsafe reports are uploaded, because
+the console output is too terse to debug from.
+
+**Smoke test the deployable image** builds the Docker image, brings the compose
+stack up on the `prod` profile, waits for `/actuator/health`, and runs the
+Postman collection against it with newman.
+
+That second job exists because the first one cannot fail for the right reasons.
+The tests use `MockMvc`: no servlet container, no socket, no image. A broken
+`Dockerfile`, a mistyped compose variable, a profile that never reaches the
+container or a datasource that dies on startup would all leave the suite green.
+It happened during development — the tests passed while the running container
+was three commits behind. The job finishes by printing the `security.log` the
+run produced into the summary, so the audit trail is visible from the CI page.
+
+**CodeQL** runs `security-extended` on every push and weekly. The schedule
+matters as much as the push trigger: new query packs ship regularly and can flag
+code nobody has touched.
+
+**Dependabot** watches Maven, the Dockerfile base images and the workflow
+actions. A published CVE in a dependency is the most likely way this becomes
+insecure without anyone changing a line of it.
 
 ---
 
