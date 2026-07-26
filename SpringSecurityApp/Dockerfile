@@ -1,5 +1,5 @@
 # Stage 1: Download dependencies
-FROM eclipse-temurin:21-jdk-alpine AS dependency
+FROM eclipse-temurin:25-jdk-alpine AS dependency
 RUN apk add --no-cache maven
 WORKDIR /build
 COPY pom.xml .
@@ -11,7 +11,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage 3: Run the application
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 RUN apk add --no-cache curl
 WORKDIR /app
 
