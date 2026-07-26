@@ -274,8 +274,16 @@ header, or the limiter can be bypassed by rotating it.
 
 ## Logs
 
-Mounted at `./logs`, one file per concern, each with the retention its content
-deserves.
+One file per concern, each with the retention its content deserves.
+
+```bash
+docker compose exec spring-security-app tail -f /app/logs/security.log
+```
+
+They live in a named volume rather than a bind mount to `./logs`: the container
+runs as a non-root user, and Docker creates a missing bind-mount directory owned
+by root, so on a clean host the application could not open its own log files.
+Everything is also on stdout, so `docker compose logs -f` works too.
 
 | | Contains | Kept |
 |---|---|---|

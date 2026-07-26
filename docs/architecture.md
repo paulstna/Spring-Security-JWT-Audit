@@ -113,7 +113,15 @@ re-download the world, the jar is built in the second, and the third is a JRE
 Alpine image running as a non-root user.
 
 `compose.yaml` waits for PostgreSQL to report healthy before starting the
-application, and mounts `./logs` so the audit trail survives the container.
+application, and keeps the audit trail in a named volume so it survives the
+container.
+
+The volume is deliberately not a bind mount to `./logs`. The container runs as a
+non-root user, and Docker creates a missing bind-mount directory owned by root,
+so on a clean host the application could not open its log files — and it refuses
+to start rather than run without an audit trail, which is the right failure for
+a service whose point is that trail. Read them with
+`docker compose exec spring-security-app tail -f /app/logs/security.log`.
 
 ## See also
 

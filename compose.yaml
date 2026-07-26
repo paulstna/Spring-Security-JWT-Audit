@@ -44,7 +44,13 @@ services:
       ports:
         - "8080:8080"
       volumes:
-        - ./logs:/app/logs
+        # A named volume, not a bind mount to ./logs. The container runs as a
+        # non-root user, and Docker creates a missing bind-mount directory owned
+        # by root, so on a clean host the application could not open its log
+        # files and refused to start. Docker seeds a named volume from the image
+        # instead, ownership included.
+        #   docker compose exec spring-security-app tail -f /app/logs/security.log
+        - app-logs:/app/logs
       healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
         interval: 30s
@@ -64,3 +70,4 @@ networks:
 
 volumes:
   postgres-data:
+  app-logs:
