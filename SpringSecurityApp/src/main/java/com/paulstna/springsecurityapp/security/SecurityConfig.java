@@ -75,9 +75,11 @@ public class SecurityConfig {
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                .addFilterBefore(rateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(mdcFilter, UsernamePasswordAuthenticationFilter.class);
+                // MdcFilter goes first so every request has a traceId, including
+                // the ones the rate limiter turns away before anything else runs.
+                .addFilterBefore(mdcFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimiterFilter, MdcFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, RateLimiterFilter.class);
 
         return http.build();
     }

@@ -1,5 +1,6 @@
 package com.paulstna.springsecurityapp.security.filter;
 
+import com.paulstna.springsecurityapp.audit.constants.MdcKeysConstants;
 import com.paulstna.springsecurityapp.jwt.domain.TokenType;
 import com.paulstna.springsecurityapp.jwt.service.IJwtProvider;
 import com.paulstna.springsecurityapp.jwt.service.ITokenExtractor;
@@ -8,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -72,6 +74,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .buildDetails(request)
         );
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // The filter that establishes the identity is the one that records it.
+        // MdcFilter runs earlier, before there is a caller to name, and clears
+        // the whole context when the request ends.
+        MDC.put(MdcKeysConstants.USER, username);
 
         filterChain.doFilter(request, response);
     }

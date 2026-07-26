@@ -9,8 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -31,12 +29,9 @@ public class MdcFilter extends OncePerRequestFilter {
             // events outside the auth flow are still attributable.
             MDC.put(MdcKeysConstants.IP, clientIpResolver.resolve(request));
 
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-            if (auth != null && auth.isAuthenticated()
-                    && auth.getPrincipal() instanceof SecurityUser user) {
-                MDC.put(MdcKeysConstants.USER, user.getUsername());
-            }
+            // The caller is not known yet: this filter runs before authentication so
+            // that a request rejected by the rate limiter still gets a traceId.
+            // JwtAuthenticationFilter adds the user once it has one.
 
             filterChain.doFilter(request, response);
 

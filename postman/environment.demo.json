@@ -1,0 +1,37 @@
+{
+  "id": "3b7e9d14-52a6-4f80-9c3b-6a1d8e2f7c45",
+  "name": "Spring Security JWT Audit — local demo",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "managerUsername",
+      "value": "manager",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "userUsername",
+      "value": "user",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "demoPassword",
+      "value": "Demo1234!",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

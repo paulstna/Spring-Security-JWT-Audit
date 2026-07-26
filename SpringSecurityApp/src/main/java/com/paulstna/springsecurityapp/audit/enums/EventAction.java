@@ -15,5 +15,6 @@ public enum EventAction {
 
     LOGOUT,
 
-    AUTHORIZATION_DENIED
+    AUTHORIZATION_DENIED,
+    RATE_LIMIT_EXCEEDED
 }

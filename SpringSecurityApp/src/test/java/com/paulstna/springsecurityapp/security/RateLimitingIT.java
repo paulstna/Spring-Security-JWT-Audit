@@ -1,8 +1,12 @@
 package com.paulstna.springsecurityapp.security;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.paulstna.springsecurityapp.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -55,7 +59,41 @@ class RateLimitingIT extends AbstractIntegrationTest {
         assertThat(limited.getContentAsString())
                 .contains("\"status\":429")
                 .contains("Rate limit exceeded")
-                .contains("\"path\":\"/api/v1/auth/login\"");
+                .contains("\"path\":\"/api/v1/auth/login\"")
+                .as("the limiter used to run before the MDC filter, so the one response "
+                        + "a caller most wants to correlate had no id to quote")
+                .contains("\"traceId\"");
+    }
+
+    /**
+     * An exhausted bucket is the clearest signal this service gets that someone
+     * is guessing credentials. It used to leave no trace at all.
+     */
+    @Test
+    @DisplayName("hitting the limit is recorded as a security event")
+    void rateLimitingIsAudited() throws Exception {
+        ListAppender<ILoggingEvent> securityLog = new ListAppender<>();
+        securityLog.start();
+        Logger logger = (Logger) LoggerFactory.getLogger("SECURITY");
+        logger.addAppender(securityLog);
+
+        try {
+            for (int attempt = 0; attempt <= LOGIN_CAPACITY; attempt++) {
+                attemptLogin(null);
+            }
+
+            assertThat(securityLog.list).anySatisfy(event -> {
+                assertThat(event.getFormattedMessage()).contains("Rate limit exceeded");
+                assertThat(event.getMDCPropertyMap())
+                        .containsEntry("eventAction", "RATE_LIMIT_EXCEEDED")
+                        .containsEntry("failureReason", "RATE_LIMIT_EXCEEDED")
+                        .containsEntry("eventType", "SECURITY");
+                assertThat(event.getMDCPropertyMap().get("traceId")).isNotBlank();
+                assertThat(event.getMDCPropertyMap().get("ip")).isNotBlank();
+            });
+        } finally {
+            logger.detachAppender(securityLog);
+        }
     }
 
     /**

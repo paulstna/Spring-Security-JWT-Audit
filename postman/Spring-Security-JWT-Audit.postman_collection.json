@@ -1,0 +1,1181 @@
+{
+  "info": {
+    "_postman_id": "8f3c1a52-0d47-4c1e-9b6a-2e7d5c4f1a90",
+    "name": "Spring Security JWT Audit",
+    "description": "A stateless REST API with rotating JWT refresh tokens, hierarchical roles, per-IP rate limiting and an audit trail.\n\n## Getting started\n\n1. `docker compose up -d` in the repository root.\n2. Import `postman/environment.demo.json` and select it.\n3. Run **Auth > Login (admin)**. It stores the access token, so every other request is authenticated with no copying by hand.\n\nThe refresh token is never handled manually: it arrives in an `HttpOnly` cookie and Postman's cookie jar sends it back.\n\n## Running the whole thing\n\nThe Collection Runner executes the folders in order and every request carries assertions, so a full run is a live check of the API rather than a click-through. Run **Rate limiting** last — it empties the login bucket on purpose.\n\n## Demo accounts\n\n`admin`, `manager` and `user`, all with password `Demo1234!`, seeded by a Flyway migration in every profile.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// A stable User-Agent matters here: a refresh token is bound to the",
+          "// client that obtained it and is refused from any other."
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastLoginFailure",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rateLimitAttempt",
+      "value": "0",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "1. Login (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"{{demoPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Signs in and stores the access token, so every later request in this collection is authenticated without copying anything by hand."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.authToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', body.authToken);",
+                  "",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "pm.test('the refresh cookie is out of reach of JavaScript', () =>",
+                  "    pm.expect(setCookie).to.include('HttpOnly'));",
+                  "pm.test('the refresh cookie is not sent cross-site', () =>",
+                  "    pm.expect(setCookie).to.include('SameSite=Strict'));",
+                  "pm.test('the refresh cookie is scoped to /api/v1/auth, not the whole API', () =>",
+                  "    pm.expect(setCookie).to.include('Path=/api/v1/auth'));",
+                  "",
+                  "// The refresh token lives in an HttpOnly cookie, so a browser cannot read it.",
+                  "// Postman's cookie jar sends it back automatically; this only copies it into a",
+                  "// variable so the 'refresh token as a bearer' case below can demonstrate the",
+                  "// type check.",
+                  "const refreshMatch = /refreshToken=([^;]+)/.exec(setCookie);",
+                  "if (refreshMatch) { pm.collectionVariables.set('refreshToken', refreshMatch[1]); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Refresh (rotates the token)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Exchanges the refresh cookie for a new access token and issues a new refresh cookie. The old one is deleted first, so a stolen token is usable at most once."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.authToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', body.authToken);",
+                  "",
+                  "// Not asserting that the access token string changed: iat and exp have",
+                  "// second granularity and access tokens carry no jti, so two issued within",
+                  "// the same second are byte-identical. The refresh token is what rotates,",
+                  "// and it does carry a random jti.",
+                  "const previousRefresh = pm.collectionVariables.get('refreshToken');",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "pm.test('issues a new refresh cookie', () =>",
+                  "    pm.expect(setCookie).to.include('refreshToken='));",
+                  "",
+                  "// The refresh token lives in an HttpOnly cookie, so a browser cannot read it.",
+                  "// Postman's cookie jar sends it back automatically; this only copies it into a",
+                  "// variable so the 'refresh token as a bearer' case below can demonstrate the",
+                  "// type check.",
+                  "const refreshMatch = /refreshToken=([^;]+)/.exec(setCookie);",
+                  "if (refreshMatch) { pm.collectionVariables.set('refreshToken', refreshMatch[1]); }",
+                  "pm.test('the refresh token really rotated', () =>",
+                  "    pm.expect(pm.collectionVariables.get('refreshToken')).to.not.equal(previousRefresh));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Revokes the refresh token server side and clears the cookie. Access tokens already issued stay valid until they expire, which is why they are short lived. Calling it twice is not an error."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));",
+                  "",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "pm.test('clears the cookie', () => pm.expect(setCookie).to.include('Max-Age=0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Register a new account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{newUsername}}\",\n    \"password\": \"Valid123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates a USER account and signs it in, so a new caller gets a usable session without a second round trip. Roles cannot be requested here.\n\nDeliberately last in this folder: it sets a refresh cookie of its own, which replaces the admin one in Postman's cookie jar. Run it before Refresh and that request would rotate this session instead of the admin one."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A fresh name per run, so the request stays repeatable.",
+                  "pm.collectionVariables.set('newUsername', 'demo.' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('signs the new account in', () =>",
+                  "    pm.expect(pm.response.json().authToken).to.be.a('string'));",
+                  "",
+                  "// Deliberately not saved as {{accessToken}}: it is a USER token, and the",
+                  "// requests that follow need the admin one."
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Obtaining, rotating and revoking a session. Run them in order: the first one stores the token everything else uses."
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "1. List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Requires MANAGER. ADMIN satisfies it because roles are hierarchical."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const users = pm.response.json();",
+                  "pm.test('returns a list', () => pm.expect(users).to.be.an('array'));",
+                  "",
+                  "// The DTO exists so these can never appear. Worth asserting, not assuming.",
+                  "pm.test('no password hash is exposed', () =>",
+                  "    pm.expect(JSON.stringify(users)).to.not.include('$2a$'));",
+                  "pm.test('no session tokens are exposed', () =>",
+                  "    users.forEach(u => pm.expect(u).to.not.have.property('tokens')));",
+                  "",
+                  "const plain = users.find(u => u.username === pm.environment.get('userUsername'));",
+                  "if (plain) { pm.collectionVariables.set('userId', plain.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Get a user by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Requires MANAGER."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('is the user that was asked for', () =>",
+                  "    pm.expect(pm.response.json().id).to.equal(pm.collectionVariables.get('userId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Create a user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{createdUsername}}\",\n    \"password\": \"Valid123!\",\n    \"roles\": [\"MANAGER\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requires ADMIN. Roles may only be granted up to the caller's own level. Omitting roles gives USER."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('createdUsername', 'created.' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "",
+                  "const user = pm.response.json();",
+                  "pm.test('has the requested role', () =>",
+                  "    pm.expect(user.roles).to.include('ROLE_MANAGER'));",
+                  "pm.test('the response carries no password', () =>",
+                  "    pm.expect(user).to.not.have.property('password'));",
+                  "pm.collectionVariables.set('createdUserId', user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Update a user",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{createdUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{createdUserId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{createdUsername}}.renamed\",\n    \"roles\": [\"USER\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requires MANAGER. The password is omitted here on purpose: leaving it out keeps the current one."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the rename took effect', () =>",
+                  "    pm.expect(pm.response.json().username).to.include('.renamed'));",
+                  "pm.test('the role was replaced', () =>",
+                  "    pm.expect(pm.response.json().roles).to.eql(['ROLE_USER']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Delete a user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{createdUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{createdUserId}}"
+              ]
+            },
+            "description": "Requires ADMIN. Removes the account and its sessions. Roles are a shared catalogue and are left untouched."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "User administration. Every request inherits the bearer token stored by Auth > Login."
+    },
+    {
+      "name": "Failure cases",
+      "item": [
+        {
+          "name": "401 — no token at all",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Authentication failed, so the answer is 401: refresh and retry. Compare with the 403 below, which no retry will fix."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('says so plainly', () =>",
+                  "    pm.expect(pm.response.json().message).to.equal('Authentication required'));",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 — a refresh token is not a bearer token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{refreshToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "A regression test in request form. The filter used to check only the signature and expiry, so a refresh token authenticated any call — a 15 minute session became a 15 day one and rotation was skipped. Tokens now declare their type."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as a plain USER (setup for the next request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{userUsername}}\",\n    \"password\": \"{{demoPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Stores a USER token so the next request can show a genuine 403."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('userAccessToken', pm.response.json().authToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 — authenticated, but the role is not enough",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "The credential is perfectly valid; the role is not. That is what separates 403 from 401, and why both exist."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('says so plainly', () =>",
+                  "    pm.expect(pm.response.json().message).to.equal('Access denied'));",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 — an ADMIN cannot mint a SYSTEM account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"climber\",\n    \"password\": \"Valid123!\",\n    \"roles\": [\"SYSTEM\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Roles may only be granted at or below the caller's own level, so the most privileged role is unreachable through the API. The attempt is recorded in security.log as AUTHORIZATION_DENIED, not swallowed as an unexpected error."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — validation, with the offending fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"a\",\n    \"password\": \"short\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Username needs 3 to 50 characters, password 8 to 72 with an uppercase letter, a lowercase letter, a digit and a symbol. The 72 cap is not arbitrary: BCrypt silently ignores anything past 72 bytes."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('names every field that failed', () => {",
+                  "    pm.expect(body.fieldErrors).to.have.property('username');",
+                  "    pm.expect(body.fieldErrors).to.have.property('password');",
+                  "});",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — no user with that id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "11111111-1111-1111-1111-111111111111"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — the username is taken",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"Valid123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A legitimate client mistake, not a fault of the service, so it stays out of error.log."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 — wrong password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"Wrong1234!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Run this and the next one together: the two answers are identical."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('says nothing specific', () =>",
+                  "    pm.expect(body.message).to.equal('Bad credentials'));",
+                  "",
+                  "// Kept so the next request can compare, minus the parts that always differ.",
+                  "delete body.timestamp; delete body.traceId;",
+                  "pm.collectionVariables.set('lastLoginFailure', JSON.stringify(body));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 — unknown username, answered identically",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"no.such.person\",\n    \"password\": \"Wrong1234!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Account state is checked before the password, so a distinct message here would confirm which usernames exist. The real reason is in security.log instead."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "",
+                  "const body = pm.response.json();",
+                  "delete body.timestamp; delete body.traceId;",
+                  "pm.test('indistinguishable from a wrong password', () =>",
+                  "    pm.expect(JSON.stringify(body)).to.equal(",
+                  "        pm.collectionVariables.get('lastLoginFailure')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "415 — the body is not JSON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "not json"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('415 Unsupported Media Type', () => pm.response.to.have.status(415));",
+                  "",
+                  "pm.test('uses the shared error shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', pm.response.code);",
+                  "    pm.expect(body).to.have.property('path');",
+                  "    pm.expect(body.traceId, 'traceId matches the log entry').to.be.a('string');",
+                  "});",
+                  "pm.test('leaks nothing internal', () => {",
+                  "    const raw = pm.response.text();",
+                  "    pm.expect(raw).to.not.include('Exception');",
+                  "    pm.expect(raw).to.not.include('com.paulstna');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Every one of these is a control that exists for a reason, and most are regressions from hardening this project. They double as documentation of the error contract: one shape, always with a traceId."
+    },
+    {
+      "name": "Rate limiting",
+      "item": [
+        {
+          "name": "429 — repeat until the login bucket is empty",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"Wrong1234!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Login allows 5 attempts per minute per client IP, refilling 2 every 60 seconds. Run this in the Collection Runner (or newman): it calls itself until the bucket is empty. Sending it once by hand does not loop."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempt = Number(pm.collectionVariables.get('rateLimitAttempt') || 0) + 1;",
+                  "pm.collectionVariables.set('rateLimitAttempt', attempt);",
+                  "",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('the bucket runs out and answers 429', () => pm.response.to.have.status(429));",
+                  "    pm.test('tells the client how long to wait', () =>",
+                  "        pm.expect(pm.response.headers.get('Retry-After')).to.be.a('string'));",
+                  "    pm.test('uses the same error shape as everything else', () => {",
+                  "        const body = pm.response.json();",
+                  "        pm.expect(body.status).to.equal(429);",
+                  "        pm.expect(body.message).to.include('Rate limit exceeded');",
+                  "        pm.expect(body.traceId).to.be.a('string');",
+                  "    });",
+                  "    pm.collectionVariables.set('rateLimitAttempt', 0);",
+                  "    // No setNextRequest: the run simply carries on.",
+                  "} else if (attempt < 12) {",
+                  "    postman.setNextRequest('429 — repeat until the login bucket is empty');",
+                  "} else {",
+                  "    pm.collectionVariables.set('rateLimitAttempt', 0);",
+                  "    pm.test('the limiter should have fired by now', () =>",
+                  "        pm.expect.fail('12 logins went through without a 429'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Kept last: it deliberately empties the login bucket, so anything after it would be throttled. Wait a minute before signing in again."
+    }
+  ]
+}
