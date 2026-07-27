@@ -58,6 +58,25 @@ shorter one quietly signs with HS384 instead of HS512.
 
 ---
 
+## If you have five minutes
+
+Start with **[docs/findings.md](docs/findings.md)** — the defects found while
+hardening this, and what caught each one. It is the most honest thing in the
+repository: a signed-in user could once read and modify any other account, a
+refresh token authenticated any request, and deleting a user destroyed a role
+for everyone else. Each has a test that fails if it comes back.
+
+Then, if you want code:
+
+| | |
+|---|---|
+| [`SecurityConfig`](SpringSecurityApp/src/main/java/com/paulstna/springsecurityapp/security/SecurityConfig.java) | The filter chain and the rules, including the `401`/`403` split |
+| [`AuthServiceImpl.refreshToken`](SpringSecurityApp/src/main/java/com/paulstna/springsecurityapp/auth/service/AuthServiceImpl.java) | Rotation, and every reason a token is refused |
+| [`AuditLoggingIT`](SpringSecurityApp/src/test/java/com/paulstna/springsecurityapp/audit/AuditLoggingIT.java) | Asserts *which log* each event lands in, not just that it was logged |
+| [`OpenApiConventions`](SpringSecurityApp/src/main/java/com/paulstna/springsecurityapp/common/config/OpenApiConventions.java) | `429` is documented only where the limiter is configured, read from the same properties the filter uses |
+
+---
+
 ## What is interesting here
 
 **Refresh tokens rotate and are stored hashed.** Every refresh deletes the old
@@ -181,6 +200,7 @@ signing in again.
 | [Data model](docs/er-diagram.md) | Schema, and why each column is what it is |
 | [Security model](docs/SECURITY.md) | Threats, controls, and what is **not** covered |
 | [Design decisions](docs/adr/README.md) | ADRs: the alternatives and what each choice costs |
+| [Findings](docs/findings.md) | Defects found while hardening this, and what caught each |
 
 ---
 
